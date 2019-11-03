@@ -7,6 +7,7 @@ import pytz
 import subprocess
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 from bottle import SimpleTemplate
 
@@ -14,14 +15,28 @@ ISO = '%Y-%m-%dT%H:%M:%SZ'
 MILES_PER_METER = 0.000621371
 
 def main(argv):
-    with open('test.template.html') as f:
+    template_path = argv[0]
+    cache_path = Path('./cache')
+    fit_paths = argv[1:]
+
+    with open(template_path) as f:
         content = f.read()
 
-    for name in argv:
-        print(name)
+    for path_string in fit_paths:
+        input_path = Path(path_string)
+        xml_path = cache_path / (input_path.stem + '.xml')
+        if not xml_path.exists():
+            convert_to_xml(input_path, xml_path)
+        process(xml_path)
     return
-    # xml = subprocess.check_output('~/usr/lib/garmin/fit2tcx',
-    #                               '~/Downloads/96270558.FIT')
+
+def convert_to_xml(input_path, output_path):
+    print('Converting', input_path)
+    cmd = '/home/brandon/usr/lib/garmin/fit2tcx'
+    with open(output_path, 'w') as f:
+        xml = subprocess.run([cmd, input_path], stdout=f)
+
+def process(path):
     xml = open('/home/brandon/tmp.tcx').read()
     xml = xml.replace(
         'xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2"',
