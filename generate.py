@@ -16,28 +16,37 @@ MILES_PER_METER = 0.000621371
 
 def main(argv):
     template_path = argv[0]
-    cache_path = Path('./cache')
+    cache_dir = Path('./cache')
+    output_dir = Path('./output')
     fit_paths = argv[1:]
 
     with open(template_path) as f:
-        content = f.read()
+        template_html = f.read()
+
+    if not output_dir.is_dir():
+        output_dir.mkdir()
+
+    summaries = []
 
     for path_string in fit_paths:
         input_path = Path(path_string)
-        xml_path = cache_path / (input_path.stem + '.xml')
+        xml_path = cache_dir / (input_path.stem + '.xml')
+        html_path = output_dir / (input_path.stem + '.html')
         if not xml_path.exists():
             convert_to_xml(input_path, xml_path)
-        process(xml_path)
-    return
+        summary = process(xml_path, template_html, html_path)
+        summaries.append(summary)
+
+    write_index(summaries, output_dir / 'index.html')
 
 def convert_to_xml(input_path, output_path):
-    print('Converting', input_path)
+    print('Converting', input_path, '->', output_path)
     cmd = '/home/brandon/usr/lib/garmin/fit2tcx'
     with open(output_path, 'w') as f:
         xml = subprocess.run([cmd, input_path], stdout=f)
 
-def process(path):
-    xml = open('/home/brandon/tmp.tcx').read()
+def process(xml_path, template_html, output_path):
+    xml = open(xml_path).read()
     xml = xml.replace(
         'xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2"',
         '',
@@ -100,7 +109,7 @@ def process(path):
     duration = trackpoints[-1].time - trackpoints[0].time
     #mph = miles / duration.total_seconds() * 60 * 60
 
-    template = SimpleTemplate(content)
+    template = SimpleTemplate(template_html)
     content = template.render(
         duration=duration,
         icons=json.dumps(icons),
@@ -113,9 +122,28 @@ def process(path):
 
     print(splits)
 
-    #sys.stdout.write(content)
-    with open('test.html', 'w') as f:
+    with open(output_path, 'w') as f:
         f.write(content)
+
+    return Summary(start=trackpoints[0].time, miles=miles, url=output_path.name)
+
+def write_index(summaries, output_path):
+    with open('index.template.html') as f:
+        template_html = f.read()
+
+    template = SimpleTemplate(template_html)
+    content = template.render(
+        summaries=summaries,
+    )
+
+    with open(output_path, 'w') as f:
+        f.write(content)
+
+@dataclass
+class Summary(object):
+    start: dt.datetime
+    miles: float
+    url: str
 
 @dataclass
 class Trackpoint(object):
@@ -140,6 +168,9 @@ def parse_trackpoints(document):
     elements = document.findall('.//Trackpoint')
     for t in elements:
         p = t.find('Position')
+        a = t.find('AltitudeMeters')
+        if a is None:
+            continue
         yield Trackpoint(
             time = dt.datetime.strptime(t.find('Time').text, ISO),
             altitude_meters = float(t.find('AltitudeMeters').text),

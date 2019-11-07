@@ -56,8 +56,8 @@
       % end
     </table>
     <script>
-
-var map = L.map('map');
+      var maxZoom = 13;  // stamen terrain sometimes disappears at 14+
+      var map = L.map('map', {maxZoom: maxZoom});
 
 var s_layer = new L.StamenTileLayer("terrain");
 map.addLayer(s_layer);
@@ -75,14 +75,13 @@ map.addLayer(s_layer);
       //               ]
       // ]
       // ;
-      layer = L.polyline(latlngs, {color: 'red'});
 
-layer.addTo(map);
+      layer = L.polyline(latlngs, {color: 'red'});
+      layer.addTo(map);
+
       console.log(layer.getBounds());
-      //map.fitBounds(layer.getBounds());
-//      layer.on('data:loaded', function() {
-          map.fitBounds(layer.getBounds());
-//      });
+
+      map.fitBounds(layer.getBounds(), {maxZoom: maxZoom});
 
       var icons = {{!icons}};
 

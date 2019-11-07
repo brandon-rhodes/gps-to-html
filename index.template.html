@@ -1,0 +1,28 @@
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      .my-div-icon {
+          border: 2px solid black;
+          border-radius: 4px;
+      }
+      .my-tooltip {
+          border: none;
+          background: none;
+          box-shadow: none;
+          line-height: 1em;
+      }
+      .my-tooltip::before {
+          content: none;
+      }
+    </style>
+  </head>
+  <body>
+    % for summary in summaries:
+    {{summary.start.strftime('%Y %B %-d')}} —
+    <a href="{{summary.url}}">{{'%.02f' % summary.miles}} miles</a>
+    <br>
+    % end
+  </body>
+</html>
+
