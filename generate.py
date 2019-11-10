@@ -15,6 +15,7 @@ import reverse_geocoder
 
 ISO = '%Y-%m-%dT%H:%M:%SZ'
 MILES_PER_METER = 0.000621371
+nan = float('nan')
 
 def main(argv):
     template_path = argv[0]
@@ -203,7 +204,10 @@ class Split(object):
     mph: float = 0.0
 
 def mph(meters, duration):
-    return meters * MILES_PER_METER / duration.total_seconds() * 60 * 60
+    try:
+        return meters * MILES_PER_METER / duration.total_seconds() * 60 * 60
+    except ZeroDivisionError:
+        return 0.0
 
 def parse_trackpoints(document):
     elements = document.findall('.//Trackpoint')
@@ -213,12 +217,26 @@ def parse_trackpoints(document):
         if a is None:
             continue
         yield Trackpoint(
-            time = dt.datetime.strptime(t.find('Time').text, ISO),
+            time = date_of(t, 'Time'),
             altitude_meters = float(t.find('AltitudeMeters').text),
-            distance_meters = float(t.find('DistanceMeters').text),
+            distance_meters = float_of(t, 'DistanceMeters'),
             latitude_degrees = float(p.find('LatitudeDegrees').text),
             longitude_degrees = float(p.find('LongitudeDegrees').text),
         )
+
+def date_of(parent, name):
+    element = parent.find(name)
+    if element is None:
+        s = '2019-11-11T01:02:03Z'
+    else:
+        s = e.text
+    return dt.datetime.strptime(s, ISO)
+
+def float_of(parent, name):
+    element = parent.find(name)
+    if element is None:
+        return nan
+    return float(element.text)
 
 def compute_mileposts(datapoints):
     datapoints = list(datapoints)
