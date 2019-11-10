@@ -11,6 +11,8 @@ from pathlib import Path
 
 from bottle import SimpleTemplate
 
+import reverse_geocoder
+
 ISO = '%Y-%m-%dT%H:%M:%SZ'
 MILES_PER_METER = 0.000621371
 
@@ -26,6 +28,8 @@ def main(argv):
     if not output_dir.is_dir():
         output_dir.mkdir()
 
+    geocoder = CachingGeocoder(cache_dir / 'geocodings.json')
+
     summaries = []
 
     for path_string in fit_paths:
@@ -34,10 +38,34 @@ def main(argv):
         html_path = output_dir / (input_path.stem + '.html')
         if not xml_path.exists():
             convert_to_xml(input_path, xml_path)
-        summary = process(xml_path, template_html, html_path)
+        summary = process(xml_path, geocoder, template_html, html_path)
         summaries.append(summary)
 
     write_index(summaries, output_dir / 'index.html')
+    geocoder.save()
+
+class CachingGeocoder(object):
+    def __init__(self, path):
+        self.path = path
+        try:
+            self.data = json.load(path.open())
+        except FileNotFoundError:
+            self.data = {}
+
+    def search(self, lat, lon):
+        key = '%.6f %.6f' % (lat, lon)
+        result = self.data.get(key)
+        if result is not None:
+            return result
+        result = reverse_geocoder.search([(lat, lon)])
+        self.data[key] = result
+        return result
+
+    def save(self):
+        j = json.dumps(self.data)  # to catch all errors before opening file
+        with self.path.open('w') as f:
+            f.write(j)
+            f.write('\n')
 
 def convert_to_xml(input_path, output_path):
     print('Converting', input_path, '->', output_path)
@@ -45,7 +73,7 @@ def convert_to_xml(input_path, output_path):
     with open(output_path, 'w') as f:
         xml = subprocess.run([cmd, input_path], stdout=f)
 
-def process(xml_path, template_html, output_path):
+def process(xml_path, geocoder, template_html, output_path):
     xml = open(xml_path).read()
     xml = xml.replace(
         'xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2"',
@@ -62,10 +90,15 @@ def process(xml_path, template_html, output_path):
 
     trackpoints = list(parse_trackpoints(x))
 
+    lat0 = trackpoints[0].latitude_degrees
+    lon0 = trackpoints[0].longitude_degrees
+
+    geocodes = geocoder.search(lat0, lon0)
+    geocode = geocodes[0]
+
     from timezonefinder import TimezoneFinder
     tf = TimezoneFinder()
-    name = tf.timezone_at(lng=trackpoints[0].longitude_degrees,
-                          lat=trackpoints[0].latitude_degrees)
+    name = tf.timezone_at(lng=lon0, lat=lat0)
     tz = pytz.timezone(name)
     utc = pytz.utc
     print(tz)
@@ -79,7 +112,7 @@ def process(xml_path, template_html, output_path):
         {
             'lat': p.latitude_degrees,
             'lon': p.longitude_degrees,
-            'label': '{} mi<br>{:%-I:%M} {}'.format(
+            'label': '{:.0f} mi<br>{:%-I:%M} {}'.format(
                 p.distance_meters * MILES_PER_METER,
                 p.time,
                 p.time.strftime('%p').lower(),
@@ -120,12 +153,19 @@ def process(xml_path, template_html, output_path):
         start=trackpoints[0].time,
     )
 
-    print(splits)
+    #print(splits)
 
     with open(output_path, 'w') as f:
         f.write(content)
 
-    return Summary(start=trackpoints[0].time, miles=miles, url=output_path.name)
+    print(geocode)
+
+    return Summary(
+        geocode=geocode,
+        start=trackpoints[0].time,
+        miles=miles,
+        url=output_path.name,
+    )
 
 def write_index(summaries, output_path):
     with open('index.template.html') as f:
@@ -141,6 +181,7 @@ def write_index(summaries, output_path):
 
 @dataclass
 class Summary(object):
+    geocode: dict
     start: dt.datetime
     miles: float
     url: str

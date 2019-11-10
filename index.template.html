@@ -21,6 +21,7 @@
     % for summary in summaries:
     {{summary.start.strftime('%Y %B %-d')}} —
     <a href="{{summary.url}}">{{'%.02f' % summary.miles}} miles</a>
+    near {{summary.geocode['name']}}, {{summary.geocode['admin1']}}
     <br>
     % end
   </body>
