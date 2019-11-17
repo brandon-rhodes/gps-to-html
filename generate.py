@@ -18,6 +18,24 @@ MILES_PER_METER = 0.000621371
 nan = float('nan')
 
 def main(argv):
+    scene = Scene()
+    scene.append('red_mountain_1.gpx')
+    scene.write('output/OUT.html')
+
+class Scene:
+    def append(self, path):
+        path = Path(path).expanduser()
+        with path.open() as f:
+            xml = 
+
+    def write(self, path):
+        html = 'foof'
+        path = Path(path).expanduser()
+        with path.open('w') as f:
+            f.write(html)
+
+def foof():
+    exit
     template_path = argv[0]
     cache_dir = Path('./cache')
     output_dir = Path('./output')
