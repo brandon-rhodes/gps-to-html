@@ -21,7 +21,9 @@ nan = float('nan')
 def main(argv):
     scene = Scene()
     scene.append('~/Downloads/red_mountain_1.gpx')
+    scene.add_icon('Camp 1')
     scene.append('~/Downloads/red_mountain_2.gpx')
+    scene.add_icon('Camp 2')
     scene.append('~/Downloads/red_mountain_3.gpx')
     print(len(scene.trackpoints))
     cache_dir = Path('./cache')
@@ -30,6 +32,7 @@ def main(argv):
 
 class Scene:
     def __init__(self):
+        self.icons = []
         self.trackpoints = []
 
     def append(self, path):
@@ -50,8 +53,16 @@ class Scene:
         trackpoints = parse_trackpoints(x)
         self.trackpoints.extend(trackpoints)
 
+    def add_icon(self, label):
+        p = self.trackpoints[-1]
+        self.icons.append({
+            'lat': p.latitude_degrees,
+            'lon': p.longitude_degrees,
+            'label': label,
+        })
+
     def write(self, geocoder, path, start=None):
-        html = render_html(self, geocoder, start)
+        html = render_html(self, geocoder, start, self.icons)
         path = Path(path).expanduser()
         with path.open('w') as f:
             f.write(html)
@@ -130,7 +141,7 @@ def process(xml_path, geocoder, template_html, output_path):
 
     trackpoints = list(parse_trackpoints(x))
 
-def render_html(scene, geocoder, start=None):
+def render_html(scene, geocoder, start, icons):
     trackpoints = scene.trackpoints
 
     lat0 = trackpoints[0].latitude_degrees
@@ -152,7 +163,7 @@ def render_html(scene, geocoder, start=None):
     route = [[p.latitude_degrees, p.longitude_degrees] for p in trackpoints]
     mileposts = list(compute_mileposts(trackpoints))
 
-    icons = [
+    icons_TODO = [
         {
             'lat': p.latitude_degrees,
             'lon': p.longitude_degrees,
