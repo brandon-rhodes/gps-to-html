@@ -9,6 +9,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+import xml.etree.ElementTree as etree
 from bottle import SimpleTemplate
 
 import reverse_geocoder
@@ -19,17 +20,38 @@ nan = float('nan')
 
 def main(argv):
     scene = Scene()
-    scene.append('red_mountain_1.gpx')
-    scene.write('output/OUT.html')
+    scene.append('~/Downloads/red_mountain_1.gpx')
+    scene.append('~/Downloads/red_mountain_2.gpx')
+    scene.append('~/Downloads/red_mountain_3.gpx')
+    print(len(scene.trackpoints))
+    cache_dir = Path('./cache')
+    geocoder = CachingGeocoder(cache_dir / 'geocodings.json')
+    scene.write(geocoder, 'output/OUT.html', dt.date(2019, 10, 26))
 
 class Scene:
+    def __init__(self):
+        self.trackpoints = []
+
     def append(self, path):
         path = Path(path).expanduser()
-        with path.open() as f:
-            xml = 
+        # cache_dir = Path('./cache')
+        # xml_path = cache_dir / (path.stem + '.xml')
+        # if not xml_path.exists():
+        #     convert_to_xml(path, xml_path)
+        # with xml_path.open() as f:
+        #     xml = f.read()
+        # xml = xml.replace('xmlns="http://www.garmin.com/xmlschemas'
+        #                   '/TrainingCenterDatabase/v2"', '')
+        # import xml.etree.ElementTree as etree
+        # x = etree.fromstring(xml)
+        # self.trackpoints.extend(parse_trackpoints(x))
+        with open(path) as f:
+            x = f.read()
+        trackpoints = parse_trackpoints(x)
+        self.trackpoints.extend(trackpoints)
 
-    def write(self, path):
-        html = 'foof'
+    def write(self, geocoder, path, start=None):
+        html = render_html(self, geocoder, start)
         path = Path(path).expanduser()
         with path.open('w') as f:
             f.write(html)
@@ -98,7 +120,6 @@ def process(xml_path, geocoder, template_html, output_path):
         'xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2"',
         '',
     )
-    import xml.etree.ElementTree as etree
     x = etree.fromstring(xml)
 
     c = []
@@ -108,6 +129,9 @@ def process(xml_path, geocoder, template_html, output_path):
     splits = []
 
     trackpoints = list(parse_trackpoints(x))
+
+def render_html(scene, geocoder, start=None):
+    trackpoints = scene.trackpoints
 
     lat0 = trackpoints[0].latitude_degrees
     lon0 = trackpoints[0].longitude_degrees
@@ -122,7 +146,8 @@ def process(xml_path, geocoder, template_html, output_path):
     utc = pytz.utc
     print(tz)
     for p in trackpoints:
-        p.time = utc.localize(p.time).astimezone(tz)
+        if p.time is not None:
+            p.time = utc.localize(p.time).astimezone(tz)
 
     route = [[p.latitude_degrees, p.longitude_degrees] for p in trackpoints]
     mileposts = list(compute_mileposts(trackpoints))
@@ -154,12 +179,21 @@ def process(xml_path, geocoder, template_html, output_path):
             )
             previous = milepost
 
-    splits = list(compute_splits(trackpoints, mileposts))
+    if trackpoints[0].time is None:
+        splits = []
+        duration = None
+    else:
+        splits = list(compute_splits(trackpoints, mileposts))
+        duration = trackpoints[-1].time - trackpoints[0].time
 
     meters = trackpoints[-1].distance_meters
     miles = meters * MILES_PER_METER
-    duration = trackpoints[-1].time - trackpoints[0].time
     #mph = miles / duration.total_seconds() * 60 * 60
+
+    # TODO: read only once instead of N times
+    template_path = 'test.template.html'
+    with open(template_path) as f:
+        template_html = f.read()
 
     template = SimpleTemplate(template_html)
     content = template.render(
@@ -169,10 +203,12 @@ def process(xml_path, geocoder, template_html, output_path):
         miles=miles,
         mph=mph(meters, duration),
         splits=splits,
-        start=trackpoints[0].time,
+        start=start or trackpoints[0].time,
     )
 
     #print(splits)
+
+    return content
 
     with open(output_path, 'w') as f:
         f.write(content)
@@ -207,9 +243,9 @@ class Summary(object):
 
 @dataclass
 class Trackpoint(object):
-    time: dt.datetime
-    altitude_meters: float = 0.0
+    time: dt.datetime = None
     distance_meters: float = 0.0
+    elevation_meters: float = 0.0
     latitude_degrees: float = 0.0
     longitude_degrees: float = 0.0
 
@@ -222,12 +258,33 @@ class Split(object):
     mph: float = 0.0
 
 def mph(meters, duration):
+    if duration is None:
+        return nan
     try:
         return meters * MILES_PER_METER / duration.total_seconds() * 60 * 60
     except ZeroDivisionError:
         return 0.0
 
-def parse_trackpoints(document):
+def parse_trackpoints(text):
+    if '<gpx ' in text:
+        return parse_gpx(text)
+    raise ValueError('not sure how to parse')
+
+import re
+XMLNS = re.compile(r' xmlns="[^"]+"')
+
+def parse_gpx(text):
+    text = XMLNS.sub('', text)
+    x = etree.fromstring(text)
+    for p in x.findall('.//trkpt'):
+        e = p.find('ele')
+        yield Trackpoint(
+            elevation_meters = float(e.text),
+            latitude_degrees = float(p.attrib['lat']),
+            longitude_degrees = float(p.attrib['lon']),
+        )
+
+def parse_whatever(document):
     elements = document.findall('.//Trackpoint')
     for t in elements:
         p = t.find('Position')
