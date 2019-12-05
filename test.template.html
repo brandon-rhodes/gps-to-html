@@ -16,10 +16,9 @@
     <script
       src="https://unpkg.com/leaflet-ajax@2.1.0/dist/leaflet.ajax.js"
       ></script>
-    <script
-      type="text/javascript"
-      src="http://maps.stamen.com/js/tile.stamen.js?v1.3.0"
-      ></script>
+    <script src="https://unpkg.com/esri-leaflet@2.3.2/dist/esri-leaflet.js"
+            integrity="sha512-6LVib9wGnqVKIClCduEwsCub7iauLXpwrd5njR2J507m3A2a4HXJDLMiSZzjcksag3UluIfuW1KzuWVI5n/cuQ=="
+            crossorigin=""></script>
     <style>
       #map {height: 80%; width: 98%;}
       .my-div-icon {
@@ -56,30 +55,17 @@
       % end
     </table>
     <script>
-      var maxZoom = 13;  // stamen terrain sometimes disappears at 14+
+      var maxZoom = 15;
       var map = L.map('map', {maxZoom: maxZoom});
 
-var s_layer = new L.StamenTileLayer("terrain");
-map.addLayer(s_layer);
+      L.esri.tiledMapLayer({
+          url: 'https://services.arcgisonline.com' +
+              '/ArcGIS/rest/services/USA_Topo_Maps/MapServer'
+      }).addTo(map);
 
-      //var layer = new L.GeoJSON.AJAX("test.json");
       latlngs = {{!route}};
-      // [
-      //               [
-      //                   39.34472609280829,
-      //                   -120.60503262123328
-      //               ],
-      //               [
-      //                   39.344836566292145,
-      //                   -120.60479658683984
-      //               ]
-      // ]
-      // ;
-
       layer = L.polyline(latlngs, {color: 'red'});
       layer.addTo(map);
-
-      console.log(layer.getBounds());
 
       map.fitBounds(layer.getBounds(), {maxZoom: maxZoom});
 
@@ -104,12 +90,6 @@ map.addLayer(s_layer);
                            }
                           ).addTo(map);
       }
-
-// label = new L.Tooltip()
-// label.setContent("static label")
-// label.setLatLng([39.33180329358755, -120.57330166947717])
-//       //map.add(label);
-//       label.addTo(map);
 
 /*
  gpsbabel -i garmin_fit -f ~/Downloads/96270558.FIT -o geojson -F test.json
