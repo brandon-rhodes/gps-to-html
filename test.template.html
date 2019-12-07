@@ -20,17 +20,29 @@
             integrity="sha512-6LVib9wGnqVKIClCduEwsCub7iauLXpwrd5njR2J507m3A2a4HXJDLMiSZzjcksag3UluIfuW1KzuWVI5n/cuQ=="
             crossorigin=""></script>
     <style>
+      td {
+          font-family: monospace;
+          text-align: right;
+      }
       #map {height: 80%; width: 98%;}
       .my-div-icon {
           border: 2px solid black;
           border-radius: 4px;
       }
+      .my-tooltip.leaflet-tooltip {
+          pointer-events: auto;
+      }
       .my-tooltip {
           border: none;
+          border-radius: 1em;
           background: none;
           box-shadow: none;
           line-height: 1em;
+          font-weight: bold;
       }
+      /*.my-tooltip:hover {
+          background: white;
+      }*/
       .my-tooltip::before {
           content: none;
       }
@@ -38,24 +50,37 @@
   </head>
   <body>
     {{start.strftime('%Y %B %-d')}} —
-    {{'%.2f' % miles}} miles in {{duration}} at {{'%.2f' % mph}} miles per hour
+    {{'%.2f' % miles}} miles
+    %if duration is not None:
+      in{{duration > 0}} {{duration}} at {{'%.2f' % mph}} miles per hour
+    %end
     <div id="map" style="border: 5px solid black"></div>
     <table>
       <tr>
         <th>Mile</th>
+        <th>Gain</th>
+        <th>Loss</th>
+        <th></th>
+        <th>Total</th>
+        <th>Elevation</th>
         <th>Duration</th>
         <th>MPH</th>
       </tr>
-      % for n, split in enumerate(splits, 1):
+      % for n, t in enumerate(splits, 1):
       <tr>
         <td>{{n}}</td>
-        <td>{{str(split.duration).split('.')[0].lstrip('0:')}}</td>
-        <td>{{'%.2f' % split.mph}}</td>
+        <td>{{'%+d' % (t.elevation_gain_meters * escale)}}</td>
+        <td>{{'%+d' % (t.elevation_loss_meters * escale)}}</td>
+        <td>=</td>
+        <td>{{'%+d' % ((t.elevation_gain_meters + t.elevation_loss_meters) * escale)}}</td>
+        <td>{{int(t.elevation_meters * escale)}}</td>
+        <td>{{'—' if t.duration is None else str(t.duration).split('.')[0].lstrip('0:')}}</td>
+        <td>{{'—' if t.mph != t.mph else '%.2f' % t.mph}}</td>
       </tr>
       % end
     </table>
     <script>
-      var maxZoom = 15;
+      var maxZoom = 16;
       var map = L.map('map', {maxZoom: maxZoom});
 
       L.esri.tiledMapLayer({

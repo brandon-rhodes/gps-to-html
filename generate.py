@@ -11,10 +11,12 @@ from pathlib import Path
 
 import xml.etree.ElementTree as etree
 from bottle import SimpleTemplate
+from geopy.distance import distance as geopy_distance
 
 import reverse_geocoder
 
 ISO = '%Y-%m-%dT%H:%M:%SZ'
+FEET_PER_METER = 3.2808399
 MILES_PER_METER = 0.000621371
 nan = float('nan')
 
@@ -50,7 +52,9 @@ class Scene:
         # self.trackpoints.extend(parse_trackpoints(x))
         with open(path) as f:
             x = f.read()
-        trackpoints = parse_trackpoints(x)
+        previous = self.trackpoints[-1] if self.trackpoints else None
+        trackpoints = list(parse_trackpoints(x))
+        trackpoints = synthesize_distance(previous, trackpoints)
         self.trackpoints.extend(trackpoints)
 
     def add_icon(self, label):
@@ -161,9 +165,9 @@ def render_html(scene, geocoder, start, icons):
             p.time = utc.localize(p.time).astimezone(tz)
 
     route = [[p.latitude_degrees, p.longitude_degrees] for p in trackpoints]
-    mileposts = list(compute_mileposts(trackpoints))
+    mileposts = list(insert_mileposts(trackpoints))
 
-    icons_TODO = [
+    icons.extend(
         {
             'lat': p.latitude_degrees,
             'lon': p.longitude_degrees,
@@ -171,30 +175,40 @@ def render_html(scene, geocoder, start, icons):
                 p.distance_meters * MILES_PER_METER,
                 p.time,
                 p.time.strftime('%p').lower(),
+            ) if p.time else '{:.0f}'.format(
+                p.distance_meters * MILES_PER_METER,
             ),
         }
         for p in mileposts
-    ]
+    )
 
     def compute_splits(trackpoints, mileposts):
         previous = trackpoints[0]
-        for milepost in mileposts + [trackpoints[-1]]:
-            meters = milepost.distance_meters - previous.distance_meters
-            duration = milepost.time - previous.time
+        for m in mileposts + [trackpoints[-1]]:
+            meters = m.distance_meters - previous.distance_meters
+            duration = m.time - previous.time if m.time else None
             yield Split(
                 start = previous.time,
-                end = milepost.time,
+                end = m.time,
                 duration = duration,
                 meters = meters,
                 mph = mph(meters, duration),
+                elevation_meters = m.elevation_meters,
+                elevation_gain_meters = (
+                    m.elevation_gain_meters - previous.elevation_gain_meters
+                    if previous else nan
+                ),
+                elevation_loss_meters = (
+                    m.elevation_loss_meters - previous.elevation_loss_meters
+                    if previous else nan
+                ),
             )
-            previous = milepost
+            previous = m
 
+    splits = list(compute_splits(trackpoints, mileposts))
     if trackpoints[0].time is None:
-        splits = []
         duration = None
     else:
-        splits = list(compute_splits(trackpoints, mileposts))
         duration = trackpoints[-1].time - trackpoints[0].time
 
     meters = trackpoints[-1].distance_meters
@@ -209,10 +223,12 @@ def render_html(scene, geocoder, start, icons):
     template = SimpleTemplate(template_html)
     content = template.render(
         duration=duration,
+        escale=FEET_PER_METER,
         icons=json.dumps(icons),
         route=json.dumps(route),
         miles=miles,
         mph=mph(meters, duration),
+        nan=nan,
         splits=splits,
         start=start or trackpoints[0].time,
     )
@@ -255,10 +271,12 @@ class Summary(object):
 @dataclass
 class Trackpoint(object):
     time: dt.datetime = None
-    distance_meters: float = 0.0
-    elevation_meters: float = 0.0
     latitude_degrees: float = 0.0
     longitude_degrees: float = 0.0
+    distance_meters: float = 0.0
+    elevation_meters: float = 0.0
+    elevation_gain_meters: float = 0.0
+    elevation_loss_meters: float = 0.0
 
 @dataclass
 class Split(object):
@@ -267,6 +285,9 @@ class Split(object):
     duration: dt.timedelta
     meters: float = 0.0
     mph: float = 0.0
+    elevation_meters: float = 0.0
+    elevation_gain_meters: float = 0.0
+    elevation_loss_meters: float = 0.0
 
 def mph(meters, duration):
     if duration is None:
@@ -304,7 +325,7 @@ def parse_whatever(document):
             continue
         yield Trackpoint(
             time = date_of(t, 'Time'),
-            altitude_meters = float(t.find('AltitudeMeters').text),
+            elevation_meters = float(t.find('AltitudeMeters').text),
             distance_meters = float_of(t, 'DistanceMeters'),
             latitude_degrees = float(p.find('LatitudeDegrees').text),
             longitude_degrees = float(p.find('LongitudeDegrees').text),
@@ -324,9 +345,28 @@ def float_of(parent, name):
         return nan
     return float(element.text)
 
-def compute_mileposts(datapoints):
+def synthesize_distance(previous, trackpoints):
+    p = previous
+    for t in trackpoints:
+        if not t.distance_meters and p:
+            t.distance_meters = p.distance_meters + geopy_distance(
+                (p.latitude_degrees, p.longitude_degrees),
+                (t.latitude_degrees, t.longitude_degrees),
+            ).m
+        if p:
+            t.elevation_gain_meters = p.elevation_gain_meters
+            t.elevation_loss_meters = p.elevation_loss_meters
+            difference = t.elevation_meters - p.elevation_meters
+            if difference > 0:
+                t.elevation_gain_meters += difference
+            else:
+                t.elevation_loss_meters += difference
+        yield t
+        p = t
+
+def insert_mileposts(datapoints):
     datapoints = list(datapoints)
-    next_mile = 1
+    next_mile = 1.0
     previous_time = 0
     previous_miles = 0
     for point in datapoints:
@@ -334,15 +374,10 @@ def compute_mileposts(datapoints):
         miles = d.distance_meters * MILES_PER_METER
         while miles > next_mile:
             fraction = (next_mile - previous_miles) / (miles - previous_miles)
-            delta = d.time - previous_time
+            delta = None if d.time is None else d.time - previous_time
             yield Trackpoint(
-                time = previous_time + delta * fraction,
+                time = None if delta is None else previous_time + delta * fraction,
                 distance_meters = next_mile / MILES_PER_METER,
-                altitude_meters = interpolate(
-                    previous_point.altitude_meters,
-                    point.altitude_meters,
-                    fraction,
-                ),
                 latitude_degrees = interpolate(
                     previous_point.latitude_degrees,
                     point.latitude_degrees,
@@ -353,9 +388,24 @@ def compute_mileposts(datapoints):
                     point.longitude_degrees,
                     fraction,
                 ),
+                elevation_meters = interpolate(
+                    previous_point.elevation_meters,
+                    point.elevation_meters,
+                    fraction,
+                ),
+                elevation_gain_meters = interpolate(
+                    previous_point.elevation_gain_meters,
+                    point.elevation_gain_meters,
+                    fraction,
+                ),
+                elevation_loss_meters = interpolate(
+                    previous_point.elevation_loss_meters,
+                    point.elevation_loss_meters,
+                    fraction,
+                ),
             )
             print(fraction)
-            next_mile += 1
+            next_mile += 1.0
         previous_time = d.time
         previous_miles = miles
         previous_point = point

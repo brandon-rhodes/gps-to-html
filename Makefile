@@ -1,4 +1,7 @@
 
 test.html: test.template.html generate.py
-	#python3 generate.py $< > $@
+	mkdir -p output
 	python3 generate.py $<
+
+loop:
+	,watch make -- *.html *.py
