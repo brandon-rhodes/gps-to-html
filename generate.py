@@ -3,10 +3,12 @@
 import argparse
 import datetime as dt
 import json
+import os
 import pytz
 import subprocess
 import sys
 from dataclasses import dataclass
+from glob import glob
 from pathlib import Path
 
 import xml.etree.ElementTree as etree
@@ -21,6 +23,10 @@ MILES_PER_METER = 0.000621371
 nan = float('nan')
 
 def main(argv):
+    # build_red_mountain()
+    build_rest()
+
+def build_red_mountain():
     scene = Scene()
     scene.append('~/Downloads/red_mountain_1.gpx')
     scene.add_icon('Camp 1')
@@ -30,7 +36,19 @@ def main(argv):
     print(len(scene.trackpoints))
     cache_dir = Path('./cache')
     geocoder = CachingGeocoder(cache_dir / 'geocodings.json')
-    scene.write(geocoder, 'output/OUT.html', dt.date(2019, 10, 26))
+    scene.write(geocoder, 'output/2019-red-mountain.html',
+                dt.date(2019, 10, 26))
+
+def build_rest():
+    cache_dir = Path('./cache')
+    geocoder = CachingGeocoder(cache_dir / 'geocodings.json')
+    for path in glob('cache/*.xml'):
+        # if not 'A3BD4526' in path:
+        #     continue
+        name = path.split('/')[1].split('.')[0]
+        scene = Scene()
+        scene.append(path)
+        scene.write(geocoder, 'output/%s.html' % name, None)
 
 class Scene:
     def __init__(self):
@@ -50,7 +68,8 @@ class Scene:
         # import xml.etree.ElementTree as etree
         # x = etree.fromstring(xml)
         # self.trackpoints.extend(parse_trackpoints(x))
-        with open(path) as f:
+        print(path)
+        with open(path, 'rb') as f:
             x = f.read()
         previous = self.trackpoints[-1] if self.trackpoints else None
         trackpoints = list(parse_trackpoints(x))
@@ -298,12 +317,16 @@ def mph(meters, duration):
         return 0.0
 
 def parse_trackpoints(text):
-    if '<gpx ' in text:
+    if b'<gpx ' in text:
         return parse_gpx(text)
+    if b'<TrainingCenterDatabase ' in text:
+        return parse_tcx(text)
     raise ValueError('not sure how to parse')
 
+#usr/lib/garmin/fit2tcx
+
 import re
-XMLNS = re.compile(r' xmlns="[^"]+"')
+XMLNS = re.compile(rb' xmlns="[^"]+"')
 
 def parse_gpx(text):
     text = XMLNS.sub('', text)
@@ -316,24 +339,30 @@ def parse_gpx(text):
             longitude_degrees = float(p.attrib['lon']),
         )
 
-def parse_whatever(document):
-    elements = document.findall('.//Trackpoint')
+def parse_tcx(text):
+    text = XMLNS.sub(b'', text)
+    x = etree.fromstring(text)
+    elements = x.findall('.//Trackpoint')
     for t in elements:
+        alt = t.find('AltitudeMeters')
         p = t.find('Position')
-        a = t.find('AltitudeMeters')
-        if a is None:
+        if alt is None or p is None:
             continue
+        lat = p.find('LatitudeDegrees')
+        lon = p.find('LongitudeDegrees')
+        # if alt is None or lat is None or lon is None:
+        #     continue
         yield Trackpoint(
             time = date_of(t, 'Time'),
-            elevation_meters = float(t.find('AltitudeMeters').text),
+            elevation_meters = float(alt.text),
             distance_meters = float_of(t, 'DistanceMeters'),
-            latitude_degrees = float(p.find('LatitudeDegrees').text),
-            longitude_degrees = float(p.find('LongitudeDegrees').text),
+            latitude_degrees = float(lat.text),
+            longitude_degrees = float(lon.text),
         )
 
 def date_of(parent, name):
-    element = parent.find(name)
-    if element is None:
+    e = parent.find(name)
+    if e is None:
         s = '2019-11-11T01:02:03Z'
     else:
         s = e.text

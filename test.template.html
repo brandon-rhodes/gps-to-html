@@ -52,7 +52,7 @@
     {{start.strftime('%Y %B %-d')}} —
     {{'%.2f' % miles}} miles
     %if duration is not None:
-      in{{duration > 0}} {{duration}} at {{'%.2f' % mph}} miles per hour
+      in {{duration}} at {{'%.2f' % mph}} miles per hour
     %end
     <div id="map" style="border: 5px solid black"></div>
     <table>
@@ -80,7 +80,7 @@
       % end
     </table>
     <script>
-      var maxZoom = 16;
+      var maxZoom = 15;
       var map = L.map('map', {maxZoom: maxZoom});
 
       L.esri.tiledMapLayer({
