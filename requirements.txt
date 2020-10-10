@@ -1,1 +1,4 @@
+geopy
+pytz
+reverse_geocoder
 timezonefinder
