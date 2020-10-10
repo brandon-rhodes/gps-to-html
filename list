@@ -32,6 +32,9 @@ def main(argv):
         with open(path, 'rb') as f:
             text = f.read()
         trackpoints = list(parse_trackpoints(text))
+        if not trackpoints:
+            print('             EMPTY                 {}'.format(path.name))
+            continue
         track = Track(trackpoints)
         #print(trackpoints)
         print('{:%Y %b %d}  {:7.3f} km  {:24} {}'.format(

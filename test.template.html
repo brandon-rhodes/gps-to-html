@@ -49,6 +49,12 @@
     </style>
   </head>
   <body>
+    %if previous_url:
+    <a href="{{previous_url}}">Previous</a>
+    %end
+    %if next_url:
+    <a href="{{next_url}}">Next</a>
+    %end
     {{start.strftime('%Y %B %-d')}} —
     {{'%.2f' % miles}} miles
     %if duration is not None:

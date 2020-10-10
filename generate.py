@@ -25,8 +25,8 @@ nan = float('nan')
 
 def main(argv):
     # build_red_mountain()
-    # build_rest()
-    build_walhalla()
+    build_rest()
+    # build_walhalla()
 
 def build_red_mountain():
     scene = Scene()
@@ -60,12 +60,17 @@ def build_walhalla():
 def build_rest():
     cache_dir = Path('./cache')
     geocoder = CachingGeocoder(cache_dir / 'geocodings.json')
-    for path in glob('cache/*.xml'):
+    paths = sorted(glob('cache/*.xml'))
+    for i, path in enumerate(paths):
+        previous = paths[i - 1] if i else None
+        next = paths[i + 1] if i < len(paths) - 1 else None
         # if not 'A3BD4526' in path:
         #     continue
         name = path.split('/')[1].split('.')[0]
         scene = Scene()
         scene.append(path)
+        scene.previous = previous
+        scene.next = next
         scene.write(geocoder, 'output/%s.html' % name, None)
 
 def build_one(path):
@@ -81,6 +86,8 @@ def build_one(path):
 class Scene:
     def __init__(self):
         self.icons = []
+        self.previous = None
+        self.next = None
         self.trackpoints = []
 
     def append(self, path):
@@ -271,6 +278,13 @@ def render_html(scene, geocoder, start, icons):
     with open(template_path) as f:
         template_html = f.read()
 
+    def to_url(cache_file_path):
+        if not cache_file_path:
+            return None
+        return (cache_file_path
+                .split('/')[-1]
+                .replace('.xml', '.html'))
+
     template = SimpleTemplate(template_html)
     content = template.render(
         duration=duration,
@@ -280,6 +294,8 @@ def render_html(scene, geocoder, start, icons):
         miles=miles,
         mph=mph(meters, duration),
         nan=nan,
+        next_url=to_url(scene.next),
+        previous_url=to_url(scene.previous),
         splits=splits,
         start=start or trackpoints[0].time,
     )
