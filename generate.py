@@ -167,6 +167,10 @@ def process(xml_path, geocoder, template_html, output_path):
 def render_html(scene, geocoder, start, icons):
     trackpoints = scene.trackpoints
 
+    if not trackpoints:
+        print('EMPTY')
+        return 'NOTHING'
+
     lat0 = trackpoints[0].latitude_degrees
     lon0 = trackpoints[0].longitude_degrees
 
