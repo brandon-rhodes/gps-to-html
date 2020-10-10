@@ -24,7 +24,8 @@ nan = float('nan')
 
 def main(argv):
     # build_red_mountain()
-    build_rest()
+    # build_rest()
+    build_walhalla()
 
 def build_red_mountain():
     scene = Scene()
@@ -38,6 +39,23 @@ def build_red_mountain():
     geocoder = CachingGeocoder(cache_dir / 'geocodings.json')
     scene.write(geocoder, 'output/2019-red-mountain.html',
                 dt.date(2019, 10, 26))
+
+def build_walhalla():
+    # cache_dir = Path('./cache')
+    # geocoder = CachingGeocoder(cache_dir / 'geocodings.json')
+    # for path in glob('cache/*.xml'):
+    #     # if not 'A3BD4526' in path:
+    #     #     continue
+    #     name = path.split('/')[1].split('.')[0]
+    cache_dir = Path('./cache')
+    geocoder = CachingGeocoder(cache_dir / 'geocodings.json')
+
+    scene = Scene()
+    for path in sorted(glob('cache/*.xml')):
+        filename = path.split('/')[-1]
+        if 'A9R' < filename < 'AA3':
+            scene.append(path)
+    scene.write(geocoder, 'output/walhalla.html', None)
 
 def build_rest():
     cache_dir = Path('./cache')
