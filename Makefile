@@ -10,6 +10,7 @@ outputs: $(OUTPUTS)
 
 $(OUTPUTS): cache/%.xml: ../Archive/Garmin/%.FIT
 	$(HOME)/usr/lib/garmin/fit2tcx $< > /tmp/OUT
+	mkdir -p cache
 	mv /tmp/OUT $@
 
 loop:
