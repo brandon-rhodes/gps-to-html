@@ -20,6 +20,7 @@ import reverse_geocoder
 ISO = '%Y-%m-%dT%H:%M:%SZ'
 FEET_PER_METER = 3.2808399
 MILES_PER_METER = 0.000621371
+cache_dir = Path('./cache')
 nan = float('nan')
 
 def main(argv):
@@ -35,7 +36,6 @@ def build_red_mountain():
     scene.add_icon('Camp 2')
     scene.append('~/Downloads/red_mountain_3.gpx')
     print(len(scene.trackpoints))
-    cache_dir = Path('./cache')
     geocoder = CachingGeocoder(cache_dir / 'geocodings.json')
     scene.write(geocoder, 'output/2019-red-mountain.html',
                 dt.date(2019, 10, 26))
@@ -67,6 +67,16 @@ def build_rest():
         scene = Scene()
         scene.append(path)
         scene.write(geocoder, 'output/%s.html' % name, None)
+
+def build_one(path):
+    cache_dir = Path('./cache')
+    geocoder = CachingGeocoder(cache_dir / 'geocodings.json')
+    #name = path.split('/')[1].split('.')[0]
+    scene = Scene()
+    scene.append(path)
+    output_path = 'output/show.html'
+    scene.write(geocoder, output_path, None)
+    print(output_path)
 
 class Scene:
     def __init__(self):
@@ -164,7 +174,7 @@ def convert_to_xml(input_path, output_path):
     print('Converting', input_path, '->', output_path)
     cmd = '/home/brandon/usr/lib/garmin/fit2tcx'
     with open(output_path, 'w') as f:
-        xml = subprocess.run([cmd, input_path], stdout=f)
+        subprocess.run([cmd, input_path], stdout=f)
 
 def process(xml_path, geocoder, template_html, output_path):
     xml = open(xml_path).read()

@@ -1,0 +1,20 @@
+#!/usr/bin/env python3
+
+import argparse
+import sys
+
+import generate as g
+
+def main(argv):
+    parser = argparse.ArgumentParser(description='Render one track')
+    parser.add_argument('path', help='GPS file to show')
+    args = parser.parse_args(argv)
+
+    # with open(args.path, 'rb') as f:
+    #     text = f.read()
+
+    g.build_one(args.path)
+
+
+if __name__ == '__main__':
+    main(sys.argv[1:])

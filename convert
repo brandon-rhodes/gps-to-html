@@ -1,0 +1,22 @@
+#!/usr/bin/env python3
+
+import argparse
+import sys
+
+import generate as g
+
+def main(argv):
+    parser = argparse.ArgumentParser(description='Convert FIT files to XML')
+    parser.parse_args(argv)
+
+    d = g.Path('~/Archive/Garmin')
+    d = d.expanduser()
+    for path in sorted(d.iterdir()):
+        name = path.with_suffix('.xml').name
+        cpath = g.cache_dir / name
+        if cpath.exists():
+            continue
+        g.convert_to_xml(path, cpath)
+
+if __name__ == '__main__':
+    main(sys.argv[1:])
