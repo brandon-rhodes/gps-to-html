@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from glob import glob
 from pathlib import Path
 
+# TODO: honor Garmin distances
+
 import xml.etree.ElementTree as etree
 from bottle import SimpleTemplate
 from geopy.distance import distance as geopy_distance
@@ -19,14 +21,14 @@ import reverse_geocoder
 
 ISO = '%Y-%m-%dT%H:%M:%SZ'
 FEET_PER_METER = 3.2808399
-MILES_PER_METER = 0.000621371
+MILES_PER_METER = 0.000621371  # TODO: make more accurate
 cache_dir = Path('./cache')
 nan = float('nan')
 
 def main(argv):
     # build_red_mountain()
-    build_rest()
-    # build_walhalla()
+    #build_rest()
+    build_walhalla()
 
 def build_red_mountain():
     scene = Scene()
@@ -53,9 +55,16 @@ def build_walhalla():
     scene = Scene()
     for path in sorted(glob('cache/*.xml')):
         filename = path.split('/')[-1]
-        if 'A9R' < filename < 'AA3':
+        if 'A9R' < filename < 'AA1B':
             scene.append(path)
-    scene.write(geocoder, 'output/walhalla.html', None)
+    scene.write(geocoder, 'output/2020-walhalla.html', None)
+
+    scene = Scene()
+    for path in sorted(glob('cache/*.xml')):
+        filename = path.split('/')[-1]
+        if 'AA1B' < filename < 'AA29':
+            scene.append(path)
+    scene.write(geocoder, 'output/2020-saddle-mtn.html', None)
 
 def build_rest():
     cache_dir = Path('./cache')
@@ -106,9 +115,14 @@ class Scene:
         print(path)
         with open(path, 'rb') as f:
             x = f.read()
-        previous = self.trackpoints[-1] if self.trackpoints else None
+
         trackpoints = list(parse_trackpoints(x))
-        trackpoints = synthesize_distance(previous, trackpoints)
+        compute_missing_distances(trackpoints)
+        if self.trackpoints:
+            previous = self.trackpoints[-1]
+            bump_distances(trackpoints, previous.distance_meters)
+        tally_elevation(trackpoints)
+
         self.trackpoints.extend(trackpoints)
 
     def add_icon(self, label):
@@ -223,6 +237,7 @@ def render_html(scene, geocoder, start, icons):
             p.time = utc.localize(p.time).astimezone(tz)
 
     route = [[p.latitude_degrees, p.longitude_degrees] for p in trackpoints]
+    #mileposts = []
     mileposts = list(insert_mileposts(trackpoints))
 
     icons.extend(
@@ -422,32 +437,44 @@ def float_of(parent, name):
         return nan
     return float(element.text)
 
-def synthesize_distance(previous, trackpoints):
-    p = previous
+def compute_missing_distances(trackpoints):
+    trackpoints = iter(trackpoints)
+    p = next(trackpoints)
+    if p.distance_meters is None:
+        p.distance_meters = 0.0
     for t in trackpoints:
-        if not t.distance_meters and p:
+        if not t.distance_meters:
             t.distance_meters = p.distance_meters + geopy_distance(
                 (p.latitude_degrees, p.longitude_degrees),
                 (t.latitude_degrees, t.longitude_degrees),
             ).m
-        if p:
-            t.elevation_gain_meters = p.elevation_gain_meters
-            t.elevation_loss_meters = p.elevation_loss_meters
-            difference = t.elevation_meters - p.elevation_meters
-            if difference > 0:
-                t.elevation_gain_meters += difference
-            else:
-                t.elevation_loss_meters += difference
-        yield t
         p = t
+
+def bump_distances(trackpoints, meters):
+    for t in trackpoints:
+            t.distance_meters += meters
+
+def tally_elevation(trackpoints):
+    trackpoints = iter(trackpoints)
+    p = next(trackpoints)
+    for t in trackpoints:
+        t.elevation_gain_meters = p.elevation_gain_meters
+        t.elevation_loss_meters = p.elevation_loss_meters
+        difference = t.elevation_meters - p.elevation_meters
+        if difference > 0:
+            t.elevation_gain_meters += difference
+        else:
+            t.elevation_loss_meters += difference
 
 def insert_mileposts(datapoints):
     datapoints = list(datapoints)
     next_mile = 1.0
+    previous_point = None
     previous_time = 0
     previous_miles = 0
     for point in datapoints:
         d = point
+        #print(d.distance_meters)
         miles = d.distance_meters * MILES_PER_METER
         while miles > next_mile:
             fraction = (next_mile - previous_miles) / (miles - previous_miles)
