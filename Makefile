@@ -9,7 +9,7 @@ OUTPUTS = $(patsubst ../Archive/Garmin/%.FIT, cache/%.xml, $(INPUTS))
 outputs: $(OUTPUTS)
 
 $(OUTPUTS): cache/%.xml: ../Archive/Garmin/%.FIT
-	$(HOME)/usr/lib/garmin/fit2tcx $< > /tmp/OUT
+	$(HOME)/local/lib/garmin/fit2tcx $< > /tmp/OUT
 	mkdir -p cache
 	mv /tmp/OUT $@
 
