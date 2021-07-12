@@ -2,4 +2,4 @@
 
 set -e
 cd "$(dirname "${BASH_SOURCE[0]}")"
-./generate.py test.template.html ~/garmin/*
+./generate.py test.template.html ~/Archive/garmin/*

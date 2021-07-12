@@ -28,7 +28,8 @@ nan = float('nan')
 def main(argv):
     # build_red_mountain()
     #build_rest()
-    build_walhalla()
+    build_shawnee()
+    #build_walhalla()
 
 def build_red_mountain():
     scene = Scene()
@@ -40,6 +41,20 @@ def build_red_mountain():
     print(len(scene.trackpoints))
     geocoder = CachingGeocoder(cache_dir / 'geocodings.json')
     scene.write(geocoder, 'output/2019-red-mountain.html',
+                dt.date(2019, 10, 26))
+
+def build_shawnee():
+    scene = Scene()
+    scene.append('cache/B5195832.xml')
+    scene.append('cache/B51E0922.xml')
+    scene.add_icon('Camp 1')
+    scene.append('cache/B5271506.xml')
+    scene.append('cache/B52E1151.xml')
+    scene.add_icon('Camp 2')
+    scene.append('cache/B5374212.xml')
+    print(len(scene.trackpoints))
+    geocoder = CachingGeocoder(cache_dir / 'geocodings.json')
+    scene.write(geocoder, 'output/2021-shawnee.html',
                 dt.date(2019, 10, 26))
 
 def build_walhalla():
@@ -439,7 +454,9 @@ def float_of(parent, name):
 
 def compute_missing_distances(trackpoints):
     trackpoints = iter(trackpoints)
-    p = next(trackpoints)
+    p = next(trackpoints, None)
+    if p is None:
+        return
     if p.distance_meters is None:
         p.distance_meters = 0.0
     for t in trackpoints:
@@ -456,7 +473,9 @@ def bump_distances(trackpoints, meters):
 
 def tally_elevation(trackpoints):
     trackpoints = iter(trackpoints)
-    p = next(trackpoints)
+    p = next(trackpoints, None)
+    if p is None:
+        return
     for t in trackpoints:
         t.elevation_gain_meters = p.elevation_gain_meters
         t.elevation_loss_meters = p.elevation_loss_meters
