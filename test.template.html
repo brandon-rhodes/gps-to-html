@@ -69,6 +69,8 @@
         <th></th>
         <th>Total</th>
         <th>Elevation</th>
+        <th>Start</th>
+        <th>End</th>
         <th>Duration</th>
         <th>MPH</th>
       </tr>
@@ -80,6 +82,8 @@
         <td>=</td>
         <td>{{'%+d' % ((t.elevation_gain_meters + t.elevation_loss_meters) * escale)}}</td>
         <td>{{int(t.elevation_meters * escale)}}</td>
+        <td>{{t.start.strftime('%H:%M')}}</td>
+        <td>{{t.end.strftime('%H:%M')}}</td>
         <td>{{'—' if t.duration is None else str(t.duration).split('.')[0].lstrip('0:')}}</td>
         <td>{{'—' if t.mph != t.mph else '%.2f' % t.mph}}</td>
       </tr>
