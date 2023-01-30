@@ -208,7 +208,7 @@ class CachingGeocoder(object):
 
 def convert_to_xml(input_path, output_path):
     print('Converting', input_path, '->', output_path)
-    cmd = '/home/brandon/usr/lib/garmin/fit2tcx'
+    cmd = '/home/brandon/local/lib/garmin/fit2tcx'
     with open(output_path, 'w') as f:
         subprocess.run([cmd, input_path], stdout=f)
 
