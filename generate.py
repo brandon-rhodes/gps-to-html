@@ -27,9 +27,10 @@ nan = float('nan')
 
 def main(argv):
     # build_red_mountain()
-    #build_rest()
-    build_shawnee()
+    build_rest()
+    #build_shawnee()
     #build_walhalla()
+    #build_goshen()
 
 def build_red_mountain():
     scene = Scene()
@@ -80,6 +81,18 @@ def build_walhalla():
         if 'AA1B' < filename < 'AA29':
             scene.append(path)
     scene.write(geocoder, 'output/2020-saddle-mtn.html', None)
+
+def build_goshen():
+    cache_dir = Path('./cache')
+    geocoder = CachingGeocoder(cache_dir / 'geocodings.json')
+
+    scene = Scene()
+    for path in sorted(glob('cache/*.xml')):
+        filename = path.split('/')[-1]
+        if 'C8H' < filename < 'C9Z' or 'CAD' < filename:
+            scene.append(path)
+
+    scene.write(geocoder, 'output/goshen.html', None)
 
 def build_rest():
     cache_dir = Path('./cache')
@@ -252,8 +265,8 @@ def render_html(scene, geocoder, start, icons):
             p.time = utc.localize(p.time).astimezone(tz)
 
     route = [[p.latitude_degrees, p.longitude_degrees] for p in trackpoints]
-    #mileposts = []
-    mileposts = list(insert_mileposts(trackpoints))
+    mileposts = []
+    #mileposts = list(insert_mileposts(trackpoints))
 
     icons.extend(
         {
