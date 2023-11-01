@@ -90,13 +90,19 @@
       % end
     </table>
     <script>
-      var maxZoom = 15;
+      //var maxZoom = 15;
+      var maxZoom = 18;
       var map = L.map('map', {maxZoom: maxZoom});
 
-      L.esri.tiledMapLayer({
-          url: 'https://services.arcgisonline.com' +
-              '/ArcGIS/rest/services/USA_Topo_Maps/MapServer'
-      }).addTo(map);
+      // L.esri.tiledMapLayer({
+      //     url: 'https://services.arcgisonline.com' +
+      //         '/ArcGIS/rest/services/USA_Topo_Maps/MapServer'
+      // }).addTo(map);
+
+      L.tileLayer( 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+          subdomains: ['a','b','c']
+      }).addTo( map );
 
       latlngs = {{!route}};
       layer = L.polyline(latlngs, {color: 'red'});
