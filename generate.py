@@ -27,10 +27,11 @@ nan = float('nan')
 
 def main(argv):
     # build_red_mountain()
-    build_rest()
+    #build_rest()
     #build_shawnee()
     #build_walhalla()
     #build_goshen()
+    build_hikes()
 
 def build_red_mountain():
     scene = Scene()
@@ -93,6 +94,15 @@ def build_goshen():
             scene.append(path)
 
     scene.write(geocoder, 'output/goshen.html', None)
+
+def build_hikes():
+    geocoder = CachingGeocoder(cache_dir / 'geocodings.json')
+    scene = Scene()
+    scene.append('cache/E32E0720.xml')
+    scene.write(geocoder, 'output/2024-03-oak-openings.html')
+    scene = Scene()
+    scene.append('cache/E33A1047.xml')
+    scene.write(geocoder, 'output/2024-03-grand-rapids-ohio.html')
 
 def build_rest():
     cache_dir = Path('./cache')
@@ -262,11 +272,13 @@ def render_html(scene, geocoder, start, icons):
     print(tz)
     for p in trackpoints:
         if p.time is not None:
-            p.time = utc.localize(p.time).astimezone(tz)
+            if p.time.tzinfo is None:
+                p.time = utc.localize(p.time)
+            p.time = p.time.astimezone(tz)
 
     route = [[p.latitude_degrees, p.longitude_degrees] for p in trackpoints]
     mileposts = []
-    #mileposts = list(insert_mileposts(trackpoints))
+    mileposts = list(insert_mileposts(trackpoints))
 
     icons.extend(
         {
@@ -481,8 +493,9 @@ def compute_missing_distances(trackpoints):
         p = t
 
 def bump_distances(trackpoints, meters):
+    """Add `meters` to the distance-so-far of every point in `trackpoints`."""
     for t in trackpoints:
-            t.distance_meters += meters
+        t.distance_meters += meters
 
 def tally_elevation(trackpoints):
     trackpoints = iter(trackpoints)

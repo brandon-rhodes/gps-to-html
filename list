@@ -38,7 +38,7 @@ def main(argv):
             continue
         track = Track(trackpoints)
         #print(trackpoints)
-        print('{:%Y %b %d %H:%M:%S} - {:%H:%M:%S}  {:7.3f} km  {:24} {}'.format(
+        print('{:%Y-%b-%d %H:%M} - {:%H:%M}  {:7.3f} km  {:24} {}'.format(
             track.start(),
             track.end(),
             track.length() / 1e3,
